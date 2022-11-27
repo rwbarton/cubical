@@ -38,48 +38,7 @@ f ◃ α = cong (f ∘_) α
 _▹_ : {A : Type ℓ} {B : Type ℓ'} {C : Type ℓ''} {f f' : B → C} (α : f ≡ f') (g : A → B) → f ∘ g ≡ f' ∘ g
 α ▹ g = cong (_∘ g) α
 
-
-
-module _ {A B C P : Type ℓ} (f : A → B) (g : A → C) (g' : B → P) (f' : C → P) (α : g' ∘ f ≡ f' ∘ g)
-  where
-
-  pushoutComparison : (E : Type ℓ) → (P → E) → Σ[ g'' ∈ (B → E) ] Σ[ f'' ∈ (C → E) ] g'' ∘ f ≡ f'' ∘ g
-  pushoutComparison E h .fst = h ∘ g'
-  pushoutComparison E h .snd .fst = h ∘ f'
-  pushoutComparison E h .snd .snd = h ◃ α
-
-  record isPushout : Type (ℓ-suc ℓ) where
-    no-eta-equality
-    field
-      comparisonIsEquiv : (E : Type ℓ) → isEquiv (pushoutComparison E)
-
-  open isPushout
-
-  isPropIsPushout : isProp isPushout
-  comparisonIsEquiv (isPropIsPushout po po' i) =
-    isPropΠ (λ E → isPropIsEquiv _) (po .comparisonIsEquiv) (po' .comparisonIsEquiv) i
-
-open isPushout
-
 module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
-  -- The HIT `Pushout f g` is a pushout
-
-  PushoutIsPushout : isPushout {P = Pushout f g} f g inl inr (funExt push)
-  comparisonIsEquiv PushoutIsPushout E = isoToIsEquiv i
-    where
-      open Iso
-      i : Iso (Pushout f g → E) _
-      i .fun = pushoutComparison f g inl inr (funExt push) E
-      i .inv s (inl b) = s .fst b
-      i .inv s (inr c) = s .snd .fst c
-      i .inv s (push a k) = s .snd .snd k a
-      i .rightInv s = refl
-      i .leftInv h j (inl b) = h (inl b)
-      i .leftInv h j (inr c) = h (inr c)
-      i .leftInv h j (push a k) = h (push a k)
-
-  -- Induced map out of the pushout
-
   SpanCoconeOn : Type ℓ → Type ℓ
   SpanCoconeOn D = Σ[ g' ∈ (B → D) ] Σ[ f' ∈ (C → D) ] g' ∘ f ≡ f' ∘ g
 
@@ -93,6 +52,44 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
     α' : g' ∘ f ≡ f' ∘ g
     α' = sco .snd .snd
 
+  postcomp : {D D' : Type ℓ} → (D → D') → SpanCoconeOn D → SpanCoconeOn D'
+  postcomp h sco .fst = h ∘ sco .fst
+  postcomp h sco .snd .fst = h ∘ sco .snd .fst
+  postcomp h sco .snd .snd = h ◃ sco .snd .snd
+
+  module _ {P : Type ℓ} (g' : B → P) (f' : C → P) (α : g' ∘ f ≡ f' ∘ g) where
+    pushoutComparison : (E : Type ℓ) → (P → E) → SpanCoconeOn E
+    pushoutComparison E h = postcomp h (g' , f' , α)
+
+    record isPushout : Type (ℓ-suc ℓ) where
+      no-eta-equality
+      field
+        comparisonIsEquiv : (E : Type ℓ) → isEquiv (pushoutComparison E)
+
+    open isPushout
+
+    isPropIsPushout : isProp isPushout
+    comparisonIsEquiv (isPropIsPushout po po' i) =
+      isPropΠ (λ E → isPropIsEquiv _) (po .comparisonIsEquiv) (po' .comparisonIsEquiv) i
+
+  open isPushout
+
+  -- The HIT `Pushout f g` is a pushout
+
+  PushoutIsPushout : isPushout {P = Pushout f g} inl inr (funExt push)
+  comparisonIsEquiv PushoutIsPushout E = isoToIsEquiv i
+    where
+      open Iso
+      i : Iso (Pushout f g → E) _
+      i .fun = pushoutComparison inl inr (funExt push) E
+      i .inv s (inl b) = s .fst b
+      i .inv s (inr c) = s .snd .fst c
+      i .inv s (push a k) = s .snd .snd k a
+      i .rightInv s = refl
+      i .leftInv h j (inl b) = h (inl b)
+      i .leftInv h j (inr c) = h (inr c)
+      i .leftInv h j (push a k) = h (push a k)
+
   SpanCocone : Type (ℓ-suc ℓ)
   SpanCocone = Σ (Type ℓ) SpanCoconeOn
 
@@ -103,7 +100,7 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
     D = sc .fst
 
     SCIsPushout : Type (ℓ-suc ℓ)
-    SCIsPushout = isPushout f g g' f' α'
+    SCIsPushout = isPushout g' f' α'
 
   module _ {D₁ D₂ : Type ℓ} (sco₁ : SpanCoconeOn D₁) (sco₂ : SpanCoconeOn D₂) (h : D₁ → D₂) where
     open SpanCoconeOn sco₁ renaming (g' to g₁ ; f' to f₁ ; α' to α₁)
@@ -113,7 +110,7 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
     SpanCoconeHomOver =
       Σ[ pg ∈ g₂ ≡ h ∘ g₁ ] Σ[ pf ∈ h ∘ f₁ ≡ f₂ ] (pg ▹ f) ∙∙ (h ◃ α₁) ∙∙ (pf ▹ g) ≡ α₂
 
-    ≡≃SCHO : ((h ∘ g₁ , h ∘ f₁ , h ◃ α₁) ≡ sco₂) ≃ SpanCoconeHomOver
+    ≡≃SCHO : (postcomp h sco₁ ≡ sco₂) ≃ SpanCoconeHomOver
     ≡≃SCHO =
         ((h ∘ g₁ , h ∘ f₁ , h ◃ α₁) ≡ sco₂)
       ≃⟨ compEquiv (invEquiv ΣPath≃PathΣ) (Σ-cong-equiv-snd (λ pg' → invEquiv ΣPath≃PathΣ)) ⟩
@@ -125,26 +122,51 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
         SpanCoconeHomOver
       ■
 
+  idSCHO : {D : Type ℓ} {sco : SpanCoconeOn D} → SpanCoconeHomOver sco sco (idfun D)
+  idSCHO = fst (≡≃SCHO _ _ (idfun _)) refl
+
+  compSCHO : {D₁ D₂ D₃ : Type ℓ} {sco₁ : SpanCoconeOn D₁} {sco₂ : SpanCoconeOn D₂} {sco₃ : SpanCoconeOn D₃}
+    (h₁₂ : D₁ → D₂) (h₂₃ : D₂ → D₃) → SpanCoconeHomOver sco₁ sco₂ h₁₂ → SpanCoconeHomOver sco₂ sco₃ h₂₃
+    → SpanCoconeHomOver sco₁ sco₃ (h₂₃ ∘ h₁₂)
+  compSCHO h₁₂ h₂₃ scho₁₂ scho₂₃ =
+    fst (≡≃SCHO _ _ (h₂₃ ∘ h₁₂)) (cong (postcomp h₂₃) (invEq (≡≃SCHO _ _ h₁₂) scho₁₂) ∙ (invEq (≡≃SCHO _ _ h₂₃) scho₂₃))
+
+  -- Induced map out of the pushout
+
   module _ {sc₁ : SpanCocone} (po : SpanCocone.SCIsPushout sc₁) (sc₂ : SpanCocone) where
     open isPushout
     open SpanCocone sc₁ renaming (D to D₁ ; g' to g₁ ; f' to f₁ ; α' to α₁)
     open SpanCocone sc₂ renaming (D to D₂ ; g' to g₂ ; f' to f₂ ; α' to α₂)
 
-    private module _ where
-      h : D₁ → D₂
-      h = invIsEq (comparisonIsEquiv po D₂) (sc₂ .snd)
-
-      h≡ : (h ∘ g₁ , h ∘ f₁ , h ◃ α₁) ≡ sc₂ .snd
-      h≡ = secIsEq (comparisonIsEquiv po D₂) (sc₂ .snd)
+    inducedContr : isContr (Σ (D₁ → D₂) (SpanCoconeHomOver (sc₁ .snd) (sc₂ .snd)))
+    inducedContr = subst isContr (ua (Σ-cong-equiv-snd (λ h → ≡≃SCHO _ _ h)))
+      (equiv-proof (comparisonIsEquiv po D₂) (sc₂ .snd))
 
     induced : Σ (D₁ → D₂) (SpanCoconeHomOver (sc₁ .snd) (sc₂ .snd))
-    induced .fst = h
-    induced .snd = ≡≃SCHO _ _ h .fst h≡
+    induced = inducedContr .fst
 
-  -- Uniqueness of pushout
+    inducedUniq : (h h' : D₁ → D₂)
+      → SpanCoconeHomOver (sc₁ .snd) (sc₂ .snd) h
+      → SpanCoconeHomOver (sc₁ .snd) (sc₂ .snd) h'
+      → h ≡ h'                  -- The `SpanCoconeHomOver`s are equal too, but we don't need this.
+    inducedUniq h h' scho scho' = cong fst (isContr→isProp inducedContr (h , scho) (h' , scho'))
+
+  -- Uniqueness of pushout (up to isomorphism)
 
   module _ {sc₁ sc₂ : SpanCocone} (po₁ : SpanCocone.SCIsPushout sc₁) (po₂ : SpanCocone.SCIsPushout sc₂) where
     open SpanCocone
     private
+      open Iso
+      h₁₂ : D sc₁ → D sc₂
+      h₁₂ = induced po₁ sc₂ .fst
+
+      h₂₁ : D sc₂ → D sc₁
+      h₂₁ = induced po₂ sc₁ .fst
+
       i : Iso (D sc₁) (D sc₂)
-      i = {!!}
+      i .fun = h₁₂
+      i .inv = h₂₁
+      i .rightInv = funExt⁻
+        (inducedUniq po₂ sc₂ (h₁₂ ∘ h₂₁) (idfun (D sc₂)) (compSCHO h₂₁ h₁₂ (induced po₂ sc₁ .snd) (induced po₁ sc₂ .snd)) idSCHO)
+      i .leftInv = funExt⁻
+        (inducedUniq po₁ sc₁ (h₂₁ ∘ h₁₂) (idfun (D sc₁)) (compSCHO h₁₂ h₂₁ (induced po₁ sc₂ .snd) (induced po₂ sc₁ .snd)) idSCHO)
