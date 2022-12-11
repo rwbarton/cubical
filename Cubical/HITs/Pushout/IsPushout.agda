@@ -20,6 +20,9 @@ private
 
 -- TODO: Move these somewhere else
 
+transportRefl' : {A : Type ℓ} → transport refl ≡ idfun A
+transportRefl' = funExt transportRefl
+
 sym≡ : {A : Type ℓ} {a a' : A} → (a ≡ a') ≃ (a' ≡ a)
 sym≡ {a = a} {a' = a'} = isoToEquiv i
   where
@@ -57,6 +60,15 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
   postcomp h sco .snd .fst = h ∘ sco .snd .fst
   postcomp h sco .snd .snd = h ◃ sco .snd .snd
 
+  postcomp-id : {D : Type ℓ} → postcomp (idfun D) ≡ idfun _
+  postcomp-id = refl
+
+  postcomp-transport : {D D' : Type ℓ} (p : D ≡ D') →
+    postcomp (transport p) ≡ transport (λ i → SpanCoconeOn (p i))
+  postcomp-transport {D = D} {D' = D'} =
+    J (λ (D' : Type ℓ) (p : D ≡ D') → postcomp (transport p) ≡ transport (cong SpanCoconeOn p))
+    (cong postcomp transportRefl' ∙∙ postcomp-id ∙∙ sym transportRefl')
+
   module _ {P : Type ℓ} (g' : B → P) (f' : C → P) (α : g' ∘ f ≡ f' ∘ g) where
     pushoutComparison : (E : Type ℓ) → (P → E) → SpanCoconeOn E
     pushoutComparison E h = postcomp h (g' , f' , α)
@@ -92,6 +104,12 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
 
   SpanCocone : Type (ℓ-suc ℓ)
   SpanCocone = Σ (Type ℓ) SpanCoconeOn
+
+  PushoutSC : SpanCocone
+  PushoutSC .fst = Pushout f g
+  PushoutSC .snd .fst = inl
+  PushoutSC .snd .snd .fst = inr
+  PushoutSC .snd .snd .snd = funExt push
 
   module SpanCocone (sc : SpanCocone) where
     open SpanCoconeOn (sc .snd) public
@@ -151,7 +169,7 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
       → h ≡ h'                  -- The `SpanCoconeHomOver`s are equal too, but we don't need this.
     inducedUniq h h' scho scho' = cong fst (isContr→isProp inducedContr (h , scho) (h' , scho'))
 
-  -- Uniqueness of pushout (up to isomorphism)
+  -- Uniqueness of pushout (up to isomorphism / a path)
 
   module _ {sc₁ sc₂ : SpanCocone} (po₁ : SpanCocone.SCIsPushout sc₁) (po₂ : SpanCocone.SCIsPushout sc₂) where
     open SpanCocone
@@ -170,3 +188,34 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
         (inducedUniq po₂ sc₂ (h₁₂ ∘ h₂₁) (idfun (D sc₂)) (compSCHO h₂₁ h₁₂ (induced po₂ sc₁ .snd) (induced po₁ sc₂ .snd)) idSCHO)
       i .leftInv = funExt⁻
         (inducedUniq po₁ sc₁ (h₂₁ ∘ h₁₂) (idfun (D sc₁)) (compSCHO h₁₂ h₂₁ (induced po₁ sc₂ .snd) (induced po₂ sc₁ .snd)) idSCHO)
+
+      pD : D sc₁ ≡ D sc₂
+      pD = ua (isoToEquiv i)
+
+      transport-pD : transport pD ≡ h₁₂
+      transport-pD = funExt (uaβ (isoToEquiv i))
+
+    pushoutUnique : sc₁ ≡ sc₂
+    pushoutUnique = ΣPathTransport→PathΣ sc₁ sc₂
+      (pD ,
+       sym (postcomp-transport pD ≡$ sc₁ .snd)
+       ∙ cong (λ z → postcomp z (sc₁ .snd)) transport-pD
+       ∙ invEq (≡≃SCHO (sc₁ .snd) (sc₂ .snd) h₁₂) (induced po₁ sc₂ .snd))
+
+  -- Any pushout is equal to Pushout
+  pushoutIsPushout : {sc : SpanCocone} (po : SpanCocone.SCIsPushout sc) → PushoutSC ≡ sc
+  pushoutIsPushout = pushoutUnique PushoutIsPushout
+
+  -- Induction principle for pushouts:
+  -- to prove a property for any pushout diagram,
+  -- it suffices to prove it for Pushout.
+  pushoutRec : {Z : {P : Type ℓ} (g' : B → P) (f' : C → P) (α : g' ∘ f ≡ f' ∘ g) → Type ℓ'} →
+    Z {P = Pushout f g} inl inr (funExt push) →
+    {P : Type ℓ} (g' : B → P) (f' : C → P) (α : g' ∘ f ≡ f' ∘ g) (po : isPushout g' f' α) → Z g' f' α
+  pushoutRec {Z = Z} hZ g' f' α po = subst Z' (pushoutIsPushout po) hZ'
+    where
+      Z' : SpanCocone → Type _
+      Z' sc = Z (sc .snd .fst) (sc .snd .snd .fst) (sc .snd .snd .snd)
+
+      hZ' : Z' PushoutSC
+      hZ' = hZ
