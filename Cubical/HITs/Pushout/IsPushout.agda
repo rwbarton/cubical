@@ -316,18 +316,93 @@ module _ {A A' A'' B : Type ℓ} {f₀ : A → A'} {f₁ : A' → A''} {g : A �
     pastePushout =
       isPushoutOfIsoIsPushout _ _ (invIso (PushoutDistr.PushoutDistrIso f₁ f₀ g)) (PushoutIsPushout _ _)
 
-  pasteIsPushout : {B' B'' : Type ℓ} {g' : A' → B'} {g'' : A'' → B''}
-    {f'₀ : B → B'} {f'₁ : B' → B''} {β : g' ∘ f₀ ≡ f'₀ ∘ g} {γ : g'' ∘ f₁ ≡ f'₁ ∘ g'} →
-    isPushout f₀ g g' f'₀ β → isPushout f₁ g' g'' f'₁ γ →
-    isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) ((γ ▹ f₀) ∙ (f'₁ ◃ β))
-  pasteIsPushout po₀ po₁ =
-    pushoutRec f₀ g
-      {Z = λ {B' : Type ℓ} (g' : A' → B') (f'₀ : B → B') (β : g' ∘ f₀ ≡ f'₀ ∘ g) →
-           {B'' : Type ℓ} {g'' : A'' → B''} {f'₁ : B' → B''} {γ : g'' ∘ f₁ ≡ f'₁ ∘ g'} →
-           isPushout f₁ g' g'' f'₁ γ → isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) ((γ ▹ f₀) ∙ (f'₁ ◃ β))}
-      (λ {B'' = B''} {g'' = g''} {f'₁ = f'₁} {γ = γ} →
-        pushoutRec _ _
-          {Z = λ {B'' : Type ℓ} (g'' : A'' → B'') (f'₁ : Pushout f₀ g → B'') (γ : g'' ∘ f₁ ≡ f'₁ ∘ inl) →
-               isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ inr) (((γ ▹ f₀) ∙ (f'₁ ◃ funExt push)))}
-          pastePushout _ _ _)
-      _ _ _ po₀ po₁
+  module _ {B' B'' : Type ℓ} {g' : A' → B'} {g'' : A'' → B''}
+    {f'₀ : B → B'} {f'₁ : B' → B''} {β : g' ∘ f₀ ≡ f'₀ ∘ g} {γ : g'' ∘ f₁ ≡ f'₁ ∘ g'} where
+
+    pasteIsPushout :
+      isPushout f₀ g g' f'₀ β → isPushout f₁ g' g'' f'₁ γ →
+      isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) ((γ ▹ f₀) ∙ (f'₁ ◃ β))
+    pasteIsPushout po₀ po₁ =
+      pushoutRec f₀ g
+        {Z = λ {B' : Type ℓ} (g' : A' → B') (f'₀ : B → B') (β : g' ∘ f₀ ≡ f'₀ ∘ g) →
+             {B'' : Type ℓ} {g'' : A'' → B''} {f'₁ : B' → B''} {γ : g'' ∘ f₁ ≡ f'₁ ∘ g'} →
+             isPushout f₁ g' g'' f'₁ γ → isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) ((γ ▹ f₀) ∙ (f'₁ ◃ β))}
+        (λ {B'' = B''} {g'' = g''} {f'₁ = f'₁} {γ = γ} →
+          pushoutRec _ _
+            {Z = λ {B'' : Type ℓ} (g'' : A'' → B'') (f'₁ : Pushout f₀ g → B'') (γ : g'' ∘ f₁ ≡ f'₁ ∘ inl) →
+                 isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ inr) (((γ ▹ f₀) ∙ (f'₁ ◃ funExt push)))}
+            pastePushout _ _ _)
+        _ _ _ po₀ po₁
+
+  module _ {B' B'' : Type ℓ} {g' : A' → B'} {g'' : A'' → B''}
+    {f'₀ : B → B'} {f'₁ : B' → B''} {β : g' ∘ f₀ ≡ f'₀ ∘ g} {γ : g'' ∘ f₁ ≡ f'₁ ∘ g'} where
+
+    -- Auxiliary definitions for deducing cancellation from pasting.
+    -- This is indirect, but maybe still easier than proving the pasting/cancellation laws directly,
+    -- without using PushoutDistrIso.
+
+    private
+      module _ (E : Type ℓ) where
+        C : SpanCoconeOn f₁ g' E → SpanCoconeOn (f₁ ∘ f₀) g E
+        C sco .fst = sco .fst
+        C sco .snd .fst = sco .snd .fst ∘ f'₀
+        C sco .snd .snd = (sco .snd .snd ▹ f₀) ∙ (sco .snd .fst ◃ β)
+
+        comm : {B''' : Type ℓ} (g'' : A'' → B''') (f'₁ : B' → B''') (γ : g'' ∘ f₁ ≡ f'₁ ∘ g') →
+          pushoutComparison (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) ((γ ▹ f₀) ∙ (f'₁ ◃ β)) E ≡ C ∘ pushoutComparison f₁ g' g'' f'₁ γ E
+        comm g'' f'₁ γ i h .fst = h ∘ g''
+        comm g'' f'₁ γ i h .snd .fst = h ∘ f'₁ ∘ f'₀
+        comm g'' f'₁ γ i h .snd .snd = cong-∙ (h ∘_) (γ ▹ f₀) (f'₁ ◃ β) i
+
+    -- When the left square is a pushout, C (which does not depend on B'' etc.) is an equivalence.
+    -- We can prove this by forming a pushout square on the right, and using pasteIsPushout.
+    -- Then use this to prove that if the original rectangle is a pushout, so is the right square.
+
+    cancelIsPushout :
+      isPushout f₀ g g' f'₀ β →
+      isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) ((γ ▹ f₀) ∙ (f'₁ ◃ β)) →
+      isPushout f₁ g' g'' f'₁ γ
+    cancelIsPushout po₀ po₂ .comparisonIsEquiv E =
+      cancelEquivL hC (subst isEquiv (comm E g'' f'₁ γ) (po₂ .comparisonIsEquiv E))
+      where
+        po'₁ : isPushout f₁ g' inl inr (funExt push)
+        po'₁ = PushoutIsPushout f₁ g'
+
+        po'₀₁ = pasteIsPushout po₀ po'₁
+
+        hC : isEquiv (C E)
+        hC = cancelEquivR (po'₁ .comparisonIsEquiv E) (subst isEquiv (comm E inl inr (funExt push)) (po'₀₁ .comparisonIsEquiv E))
+
+    -- Version with baked-in subst, since frequently
+    -- the 2-cells will not automatically line up exactly
+    -- (e.g., they differ by an `lUnit` or `rUnit`).
+    cancelIsPushout' : (δ : g'' ∘ f₁ ∘ f₀ ≡ f'₁ ∘ f'₀ ∘ g)
+      → isPushout f₀ g g' f'₀ β → isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) δ
+      → δ ≡ (γ ▹ f₀) ∙ (f'₁ ◃ β)
+      → isPushout f₁ g' g'' f'₁ γ
+    cancelIsPushout' δ po₀ po₂ η =
+      cancelIsPushout po₀ (subst (isPushout _ _ _ _) η po₂)
+
+-- Transposed pushout pasting/cancellation
+module _ {A A' A'' B B' B'' : Type ℓ} {f₀ : A → A'} {f₁ : A' → A''} {g : A → B} {g' : A' → B'} {g'' : A'' → B''}
+    {f'₀ : B → B'} {f'₁ : B' → B''} {β : f'₀ ∘ g ≡ g' ∘ f₀} {γ : f'₁ ∘ g' ≡ g'' ∘ f₁} where
+  paste'IsPushout : isPushout g f₀ f'₀ g' β → isPushout g' f₁ f'₁ g'' γ
+    → isPushout g (f₁ ∘ f₀) (f'₁ ∘ f'₀) g'' ((f'₁ ◃ β) ∙ (γ ▹ f₀))
+  paste'IsPushout po₀ po₁ =
+    subst (isPushout g (f₁ ∘ f₀) (f'₁ ∘ f'₀) g'') (symDistr (sym (γ ▹ f₀)) (sym (f'₁ ◃ β)))
+    (transposeIsPushout (pasteIsPushout (transposeIsPushout po₀) (transposeIsPushout po₁)))
+
+  cancel'IsPushout : isPushout g f₀ f'₀ g' β → isPushout g (f₁ ∘ f₀) (f'₁ ∘ f'₀) g'' ((f'₁ ◃ β) ∙ (γ ▹ f₀))
+    → isPushout g' f₁ f'₁ g'' γ
+  cancel'IsPushout po₀ po₂ =
+    transposeIsPushout {α = sym γ} (cancelIsPushout (transposeIsPushout po₀) po'₂)
+    where
+      po'₂ : isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) (sym (γ ▹ f₀) ∙ sym (f'₁ ◃ β))
+      po'₂ = subst (isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀)) (symDistr (f'₁ ◃ β) (γ ▹ f₀)) (transposeIsPushout po₂)
+
+  cancel'IsPushout' : (δ : f'₁ ∘ f'₀ ∘ g ≡ g'' ∘ f₁ ∘ f₀)
+    → isPushout g f₀ f'₀ g' β → isPushout g (f₁ ∘ f₀) (f'₁ ∘ f'₀) g'' δ
+    → δ ≡ ((f'₁ ◃ β) ∙ (γ ▹ f₀))
+    → isPushout g' f₁ f'₁ g'' γ
+  cancel'IsPushout' δ po₀ po₂ η =
+    cancel'IsPushout po₀ (subst (isPushout _ _ _ _) η po₂)
