@@ -2,6 +2,7 @@
 module Cubical.HITs.Pushout.IsPushout where
 
 open import Cubical.Foundations.Equiv
+open import Cubical.Foundations.Equiv.Properties
 open import Cubical.Foundations.Function
 open import Cubical.Foundations.GroupoidLaws
 open import Cubical.Foundations.HLevels
@@ -32,6 +33,16 @@ sym≡ {a = a} {a' = a'} = isoToEquiv i
     i .inv p = sym p
     i .rightInv p = refl
     i .leftInv p = refl
+
+module _ {A : Type ℓ} {B : Type ℓ'} {C : Type ℓ''} {f : A → B} {g : B → C} where
+  compIsEquiv : isEquiv f → isEquiv g → isEquiv (g ∘ f)
+  compIsEquiv hf hg = snd (compEquiv (_ , hf) (_ , hg))
+
+  cancelEquivL : isEquiv g → isEquiv (g ∘ f) → isEquiv f
+  cancelEquivL hg = isEquiv[equivFunA≃B∘f]→isEquiv[f] f (g , hg)
+
+  cancelEquivR : isEquiv f → isEquiv (g ∘ f) → isEquiv g
+  cancelEquivR hf = isEquiv[f∘equivFunA≃B]→isEquiv[f] g (f , hf)
 
 -- TODO: Move to separate file (Whiskering)
 
@@ -219,3 +230,55 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
 
       hZ' : Z' PushoutSC
       hZ' = hZ
+
+open isPushout
+
+-- Facts about pushouts.
+
+-- The transpose of a pushout square is a pushout.
+transposeIsPushout : {A B C P : Type ℓ} {f : A → B} {g : A → C} {g' : B → P} {f' : C → P} {α : g' ∘ f ≡ f' ∘ g} →
+  isPushout f g g' f' α → isPushout g f f' g' (sym α)
+transposeIsPushout {f = f} {g = g} po .comparisonIsEquiv E =
+  compIsEquiv (po .comparisonIsEquiv E) (isoToIsEquiv i)
+  where
+    open Iso
+    i : Iso (SpanCoconeOn f g E) (SpanCoconeOn g f E)
+    i .fun sco .fst = sco .snd .fst
+    i .fun sco .snd .fst = sco .fst
+    i .fun sco .snd .snd = sym (sco .snd .snd)
+    i .inv sco .fst = sco .snd .fst
+    i .inv sco .snd .fst = sco .fst
+    i .inv sco .snd .snd = sym (sco .snd .snd)
+    i .rightInv sco = refl
+    i .leftInv sco = refl
+
+{-
+  Any square whatsoever
+      f
+    A → B
+  g ↓ α ↓ g'
+    C → D
+      f'
+  in which g & g' are equivalences is a pushout.
+-}
+{-
+  Why: Because for any E, the map sending a cocone (g'' , f'' , β) on E to its component g''
+  is an equivalence (as f'' & β are then determined by canceling g in β : g'' ∘ f ≡ f'' ∘ g);
+  and then the map sending (h : D → E) to g'' = h ∘ g' is an equivalence, by canceling g'.
+-}
+module _ {A B C D : Type ℓ} {f : A → B} {g : A → C} {g' : B → D} {f' : C → D} {α : g' ∘ f ≡ f' ∘ g} where
+  equivIsPushout : isEquiv g → isEquiv g' → isPushout f g g' f' α
+  equivIsPushout hg hg' .comparisonIsEquiv E =
+    cancelEquivL e₁ e₂
+    where
+      e₀ : isEquiv (λ (f₁ : C → E) → f₁ ∘ g)
+      e₀ = isEquivPreComp (g , hg)
+
+      hcontr : (g'' : B → E) → isContr (Σ[ f'' ∈ (C → E) ] (g'' ∘ f ≡ f'' ∘ g))
+      hcontr g'' = subst isContr (Σ-cong-snd λ _ → isoToPath symIso) (e₀ .equiv-proof (g'' ∘ f))
+
+      e₁ : isEquiv (λ (sc : SpanCoconeOn f g E) → sc .fst)
+      e₁ = snd (Σ-contractSnd hcontr)
+
+      e₂ : isEquiv (λ (h : D → E) → h ∘ g')
+      e₂ = isEquivPreComp (g' , hg')
