@@ -282,3 +282,8 @@ module _ {A B C D : Type ℓ} {f : A → B} {g : A → C} {g' : B → D} {f' : C
 
       e₂ : isEquiv (λ (h : D → E) → h ∘ g')
       e₂ = isEquivPreComp (g' , hg')
+
+-- Same as above, but for squares in which the horizontal morphisms are equivalences.
+module _ {A B C D : Type ℓ} {f : A → B} {g : A → C} {g' : B → D} {f' : C → D} {α : g' ∘ f ≡ f' ∘ g} where
+  equivIsPushout' : isEquiv f → isEquiv f' → isPushout f g g' f' α
+  equivIsPushout' hf hf' = transposeIsPushout (equivIsPushout {α = sym α} hf hf')
