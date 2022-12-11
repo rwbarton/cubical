@@ -406,3 +406,40 @@ module _ {A A' A'' B B' B'' : Type ℓ} {f₀ : A → A'} {f₁ : A' → A''} {g
     → isPushout g' f₁ f'₁ g'' γ
   cancel'IsPushout' δ po₀ po₂ η =
     cancel'IsPushout po₀ (subst (isPushout _ _ _ _) η po₂)
+
+module _ {A B A' B' : Type ℓ} where
+  isPushoutOf : (A → B) → (A' → B') → Type _
+  isPushoutOf f f' =
+    Σ[ g ∈ (A → A') ] Σ[ g' ∈ (B → B') ] Σ[ α ∈ g' ∘ f ≡ f' ∘ g ] isPushout f g g' f' α
+
+  ipoOfPO : {f : A → B} {f' : A' → B'} {g : A → A'} {g' : B → B'} {α : g' ∘ f ≡ f' ∘ g} →
+    isPushout f g g' f' α → isPushoutOf f f'
+  ipoOfPO po .fst = _
+  ipoOfPO po .snd .fst = _
+  ipoOfPO po .snd .snd .fst = _
+  ipoOfPO po .snd .snd .snd = po
+
+  poOfIPO : {f : A → B} {f' : A' → B'} → (ipo : isPushoutOf f f') → isPushout f (ipo .fst) (ipo .snd .fst) f' (ipo .snd .snd .fst)
+  poOfIPO ipo = ipo .snd .snd .snd
+
+  -- Not a proposition.
+
+isPushoutOfSelf : {A B : Type ℓ} (f : A → B) → isPushoutOf f f
+isPushoutOfSelf {A = A} {B = B} f = ipoOfPO (equivIsPushout {α = refl} (idIsEquiv A) (idIsEquiv B))
+
+module _ {A B A' B' A'' B'' : Type ℓ} {f : A → B} {f' : A' → B'} {f'' : A'' → B''} where
+  comp-isPushoutOf : isPushoutOf f f' → isPushoutOf f' f'' → isPushoutOf f f''
+  comp-isPushoutOf ipo₀ ipo₁ = ipoOfPO (paste'IsPushout (poOfIPO ipo₀) (poOfIPO ipo₁))
+
+module _ {A B C A' B' C' : Type ℓ} {f : A → B} {f' : A' → B'} {g : B → C} {g' : B' → C'} where
+  isPushoutOf-postcomp : isPushoutOf f f' → isEquiv g → isEquiv g' → isPushoutOf (g ∘ f) (g' ∘ f')
+  isPushoutOf-postcomp ipo hg hg' =
+    ipoOfPO (pasteIsPushout (poOfIPO ipo) (equivIsPushout' {g' = invEq e (g' ∘ ipo .snd .fst)} {α = secEq e _} hg hg'))
+    where
+      e = preCompEquiv (g , hg)
+
+  isPushoutOf-precomp : isEquiv f → isEquiv f' → isPushoutOf g g' → isPushoutOf (g ∘ f) (g' ∘ f')
+  isPushoutOf-precomp hf hf' ipo =
+    ipoOfPO (pasteIsPushout (equivIsPushout' {g = invEq e (ipo .fst ∘ f)} {α = sym (secEq e _)} hf hf') (poOfIPO ipo))
+    where
+      e = postCompEquiv (f' , hf')
