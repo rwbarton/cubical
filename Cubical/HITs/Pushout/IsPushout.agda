@@ -13,7 +13,7 @@ open import Cubical.Foundations.Transport
 open import Cubical.Foundations.Univalence
 
 open import Cubical.Data.Sigma
-open import Cubical.HITs.Pushout.Base
+open import Cubical.HITs.Pushout
 
 private
   variable
@@ -23,16 +23,6 @@ private
 
 transportRefl' : {A : Type ℓ} → transport refl ≡ idfun A
 transportRefl' = funExt transportRefl
-
-sym≡ : {A : Type ℓ} {a a' : A} → (a ≡ a') ≃ (a' ≡ a)
-sym≡ {a = a} {a' = a'} = isoToEquiv i
-  where
-    open Iso
-    i : Iso (a ≡ a') (a' ≡ a)
-    i .fun p = sym p
-    i .inv p = sym p
-    i .rightInv p = refl
-    i .leftInv p = refl
 
 module _ {A : Type ℓ} {B : Type ℓ'} {C : Type ℓ''} {f : A → B} {g : B → C} where
   compIsEquiv : isEquiv f → isEquiv g → isEquiv (g ∘ f)
@@ -144,12 +134,20 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
         ((h ∘ g₁ , h ∘ f₁ , h ◃ α₁) ≡ sco₂)
       ≃⟨ compEquiv (invEquiv ΣPath≃PathΣ) (Σ-cong-equiv-snd (λ pg' → invEquiv ΣPath≃PathΣ)) ⟩
         Σ[ pg' ∈ h ∘ g₁ ≡ g₂ ] Σ[ pf ∈ h ∘ f₁ ≡ f₂ ] PathP (λ i → pg' i ∘ f ≡ pf i ∘ g) (h ◃ α₁) α₂
-      ≃⟨ Σ-cong-equiv-fst sym≡ ⟩
+      ≃⟨ Σ-cong-equiv-fst (isoToEquiv symIso) ⟩
         Σ[ pg ∈ g₂ ≡ h ∘ g₁ ] Σ[ pf ∈ h ∘ f₁ ≡ f₂ ] PathP (λ i → pg (~ i) ∘ f ≡ pf i ∘ g) (h ◃ α₁) α₂
       ≃⟨ Σ-cong-equiv-snd (λ pg → Σ-cong-equiv-snd (λ pf →
            pathToEquiv (PathP≡doubleCompPathˡ (cong (_∘ f) (sym pg)) (h ◃ α₁) α₂ (cong (_∘ g) pf)))) ⟩
         SpanCoconeHomOver
       ■
+
+    -- If h is an equivalence, we can even build a path sco₁ ≡ sco₂
+    -- from h together with a SpanCoconeHomOver h.
+    ≡-of-SCHO : (eh : isEquiv h) → SpanCoconeHomOver → PathP (λ i → SpanCoconeOn (ua (h , eh) i)) sco₁ sco₂
+    ≡-of-SCHO eh scho = toPathP
+      (sym (postcomp-transport (ua (h , eh)) ≡$ sco₁) ∙
+       cong (λ f₁ → postcomp f₁ sco₁) (funExt (uaβ (h , eh))) ∙
+       invEq ≡≃SCHO scho)
 
   idSCHO : {D : Type ℓ} {sco : SpanCoconeOn D} → SpanCoconeHomOver sco sco (idfun D)
   idSCHO = fst (≡≃SCHO _ _ (idfun _)) refl
@@ -159,6 +157,14 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
     → SpanCoconeHomOver sco₁ sco₃ (h₂₃ ∘ h₁₂)
   compSCHO h₁₂ h₂₃ scho₁₂ scho₂₃ =
     fst (≡≃SCHO _ _ (h₂₃ ∘ h₁₂)) (cong (postcomp h₂₃) (invEq (≡≃SCHO _ _ h₁₂) scho₁₂) ∙ (invEq (≡≃SCHO _ _ h₂₃) scho₂₃))
+
+  module _ {D' : Type ℓ} (sc : SpanCocone) (i : Iso (sc .fst) D') where
+    ≡-of-Iso : sc ≡ (D' , postcomp (i .Iso.fun) (sc .snd))
+    ≡-of-Iso = ΣPathP (ua (isoToEquiv i) , ≡-of-SCHO (sc .snd) (postcomp (i .Iso.fun) (sc .snd)) (i .Iso.fun) (isoToIsEquiv i) idSCHO)
+
+  module _ {P P' : Type ℓ} {g' : B → P} {f' : C → P} {α : g' ∘ f ≡ f' ∘ g} (i : Iso P P') where
+    isPushoutOfIsoIsPushout : isPushout g' f' α → isPushout (i .Iso.fun ∘ g') (i .Iso.fun ∘ f') (i .Iso.fun ◃ α)
+    isPushoutOfIsoIsPushout po = subst SpanCocone.SCIsPushout (≡-of-Iso (P , g' , f' , α) i) po
 
   -- Induced map out of the pushout
 
@@ -203,15 +209,8 @@ module _ {A B C : Type ℓ} (f : A → B) (g : A → C) where
       pD : D sc₁ ≡ D sc₂
       pD = ua (isoToEquiv i)
 
-      transport-pD : transport pD ≡ h₁₂
-      transport-pD = funExt (uaβ (isoToEquiv i))
-
     pushoutUnique : sc₁ ≡ sc₂
-    pushoutUnique = ΣPathTransport→PathΣ sc₁ sc₂
-      (pD ,
-       sym (postcomp-transport pD ≡$ sc₁ .snd)
-       ∙ cong (λ z → postcomp z (sc₁ .snd)) transport-pD
-       ∙ invEq (≡≃SCHO (sc₁ .snd) (sc₂ .snd) h₁₂) (induced po₁ sc₂ .snd))
+    pushoutUnique = ΣPathP (pD , ≡-of-SCHO (sc₁ .snd) (sc₂ .snd) h₁₂ (isoToIsEquiv i) (induced po₁ sc₂ .snd))
 
   -- Any pushout is equal to Pushout
   pushoutIsPushout : {sc : SpanCocone} (po : SpanCocone.SCIsPushout sc) → PushoutSC ≡ sc
@@ -287,3 +286,48 @@ module _ {A B C D : Type ℓ} {f : A → B} {g : A → C} {g' : B → D} {f' : C
 module _ {A B C D : Type ℓ} {f : A → B} {g : A → C} {g' : B → D} {f' : C → D} {α : g' ∘ f ≡ f' ∘ g} where
   equivIsPushout' : isEquiv f → isEquiv f' → isPushout f g g' f' α
   equivIsPushout' hf hf' = transposeIsPushout (equivIsPushout {α = sym α} hf hf')
+
+{-
+  Pushout pasting/cancellation.
+
+      f₀    f₁
+    A  →  A' → A''
+  g ↓ β g'↓  γ ↓ g''
+    B  →  B' → B''
+      f'₀   f'₁
+-}
+module _ {A A' A'' B : Type ℓ} {f₀ : A → A'} {f₁ : A' → A''} {g : A → B} where
+  private                       -- Build the iterated Pushout, which is known to be a pushout already.
+    B₁ = Pushout f₀ g
+    g₁ : A' → B₁
+    g₁ = inl
+
+    B₂ = Pushout f₁ g₁
+    g₂ : A'' → B₂
+    g₂ = inl
+
+    b₀ : B → B₁
+    b₀ = inr
+
+    b₁ : B₁ → B₂
+    b₁ = inr
+
+    pastePushout : isPushout (f₁ ∘ f₀) g g₂ (b₁ ∘ b₀) ((funExt push ▹ f₀) ∙ (inr ◃ funExt push))
+    pastePushout =
+      isPushoutOfIsoIsPushout _ _ (invIso (PushoutDistr.PushoutDistrIso f₁ f₀ g)) (PushoutIsPushout _ _)
+
+  pasteIsPushout : {B' B'' : Type ℓ} {g' : A' → B'} {g'' : A'' → B''}
+    {f'₀ : B → B'} {f'₁ : B' → B''} {β : g' ∘ f₀ ≡ f'₀ ∘ g} {γ : g'' ∘ f₁ ≡ f'₁ ∘ g'} →
+    isPushout f₀ g g' f'₀ β → isPushout f₁ g' g'' f'₁ γ →
+    isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) ((γ ▹ f₀) ∙ (f'₁ ◃ β))
+  pasteIsPushout po₀ po₁ =
+    pushoutRec f₀ g
+      {Z = λ {B' : Type ℓ} (g' : A' → B') (f'₀ : B → B') (β : g' ∘ f₀ ≡ f'₀ ∘ g) →
+           {B'' : Type ℓ} {g'' : A'' → B''} {f'₁ : B' → B''} {γ : g'' ∘ f₁ ≡ f'₁ ∘ g'} →
+           isPushout f₁ g' g'' f'₁ γ → isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ f'₀) ((γ ▹ f₀) ∙ (f'₁ ◃ β))}
+      (λ {B'' = B''} {g'' = g''} {f'₁ = f'₁} {γ = γ} →
+        pushoutRec _ _
+          {Z = λ {B'' : Type ℓ} (g'' : A'' → B'') (f'₁ : Pushout f₀ g → B'') (γ : g'' ∘ f₁ ≡ f'₁ ∘ inl) →
+               isPushout (f₁ ∘ f₀) g g'' (f'₁ ∘ inr) (((γ ▹ f₀) ∙ (f'₁ ◃ funExt push)))}
+          pastePushout _ _ _)
+      _ _ _ po₀ po₁
