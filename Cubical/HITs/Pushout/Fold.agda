@@ -98,11 +98,60 @@ module FoldStuff where
       subst (λ F → isPushoutOf F (changeApex f g g)) lem
         (isPushoutOf-postcomp (ipo2 f (idfun B) g) (isoToIsEquiv foldIso) (idIsEquiv _))
 
+  module _ {A B A' B' : Type ℓ} {f : A → B} {f' : A' → B'} (gA : A → A') (gB : B → B') (α : gB ∘ f ≡ f' ∘ gA)
+    (po : isPushout f gA gB f' α) where
+    P : Type ℓ
+    P = Pushout f f
+
+    P' : Type ℓ
+    P' = Pushout f' f'
+
+    gP : P → P'
+    gP = Pushout→ f f f' f' gA gB gB α α
+
+    inlB' : B' → P'
+    inlB' = inl
+
+    σ : (p : P) → gB (fold f p) ≡ fold f' (gP p)
+    σ (inl b) = refl
+    σ (inr b) = refl
+    σ (push a i) = λ j → w (~ j) i
+      where
+        w : cong (fold f' ∘ gP) (push a) ≡ refl {x = gB (f a)}
+        w = cong-∙∙ (fold f') (λ j → inl (α j a)) (push (gA a)) (λ j → inr (α (~ j) a)) ∙ ∙∙lCancel (sym (α ≡$ a))
+
+    γ : (b : B) → gB (fold f (inr b)) ≡ fold f' (inr (gB b))
+    γ b = σ (inl b) ∙ refl
+
+    γ≡ : (b : B) → γ b ≡ refl
+    γ≡ b = sym compPathRefl
+
+    po4 : isPushout inr gB gP inr refl
+    po4 = cancel'IsPushout' _ (PushoutIsPushout f f) (pasteIsPushout po6 po12) (λ j i a → e' a j i)
+      where
+        po6 : isPushout (idfun A) (gB ∘ f) (f' ∘ gA) (idfun B') (sym α)
+        po6 = equivIsPushout' (idIsEquiv _) (idIsEquiv _)
+
+        po12 : isPushout f (f' ∘ gA) (inl ∘ gB) inr _
+        po12 = paste'IsPushout po (PushoutIsPushout f' f')
+
+        e' : (a : A) → (cong inlB' (α ≡$ a) ∙ push (gA a)) ∙ cong inr (sym (α ≡$ a)) ≡ (cong gP (push a) ∙ refl)
+        e' a = sym (doubleCompPath-elim _ _ _) ∙ rUnit _
+
+    po7 : isPushout (fold f) gP gB (fold f') (funExt σ)
+    po7 = cancelIsPushout po4 (equivIsPushout' (idIsEquiv _) (idIsEquiv _))
+
+    ipo : isPushoutOf (fold f) (fold f')
+    ipo .fst = gP
+    ipo .snd .fst = gB
+    ipo .snd .snd .fst = (funExt σ)
+    ipo .snd .snd .snd = po7
+
 open FoldStuff
 
 task1 : {A B A' B' : Type ℓ} {f : A → B} {f' : A' → B'} (h : isPushoutOf f f') →
   isPushoutOf (fold f) (fold f')
-task1 = _
+task1 h = ipo (h .fst) (h .snd .fst) (h .snd .snd .fst) (h .snd .snd .snd)
 
 task2 : {A B C : Type ℓ} (f : A → B) (g : B → C) →
   Σ[ h ∈ (Pushout (g ∘ f) (g ∘ f) → Pushout g g) ]
