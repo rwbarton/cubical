@@ -120,12 +120,6 @@ module FoldStuff where
         w : cong (fold f' ∘ gP) (push a) ≡ refl {x = gB (f a)}
         w = cong-∙∙ (fold f') (λ j → inl (α j a)) (push (gA a)) (λ j → inr (α (~ j) a)) ∙ ∙∙lCancel (sym (α ≡$ a))
 
-    γ : (b : B) → gB (fold f (inr b)) ≡ fold f' (inr (gB b))
-    γ b = σ (inl b) ∙ refl
-
-    γ≡ : (b : B) → γ b ≡ refl
-    γ≡ b = sym compPathRefl
-
     po4 : isPushout inr gB gP inr refl
     po4 = cancel'IsPushout' _ (PushoutIsPushout f f) (pasteIsPushout po6 po12) (λ j i a → e' a j i)
       where
